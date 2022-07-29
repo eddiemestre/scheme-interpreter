@@ -1,0 +1,831 @@
+Scheme execution pipeline
+
+*****************
+*main - scheme.py
+*****************
+We start in scheme.py - at the bottom we have the @main function that is executed when a user
+types > python scheme.py in their console. 
+
+*next_line
+At the start of our run function, we assign next_line to the function buffer_input from the 
+scheme_reader.py file. buffer_input takes a string default argument "scm> " which servers as the 
+prompt for the scheme interactive interpreter. 
+
+*interactive
+We define and assign a variable interactive to True for later.
+
+*load_files
+We then define and assign a variable load_files to an empty tuple
+
+*argv
+If *argv is not Null, an input file (like tests.scm) has been provided. We try to get the filename from the 
+first value of argv. If it's a "-load" command, then we set load_files to the rest of argv.
+If not, we set the input_file to the built in TextIOWrapper object. The TextIOWrapper class
+rovides methods and attributes which helps us to read or write data to and from the file, including readlines()
+
+*lines
+we then create the line variable and assign it to the input_file.readlines(). Readlines() reads the content of a file
+line by line and returns them as a list of strings. We have now loaded in the entire input file with each
+line broken up in a list of strings.
+
+*def next_line
+we define the next_line function which returns the results of calling the buffer_lines() function on 
+the lines input. It returns a Buffer instance. Because we are just defining this next_line function, and
+not calling it, we do not enter the next_line function.
+
+*interactive
+we create a variable interactive and assign it to False
+
+*except IOError as error
+if we get an input/output error while loading or working with the input file, then we print the error
+and exit the program.
+
+
+*read_eval_print_loop
+We then execute the read_eval_print_loop function which takes in:
+    next_line -> our next_line function that we defined which returns a buffer instance after calling buffer_lines on input
+    the environment -> we call create_global_frame() here to create a new global frame
+    quiet setter, defaulted to False -> we do not pass in a quiet setter, so it defaults to False 
+    startup setter defaulted to False -> we do pass in a startup setter which sets the parameter to True
+    interactive setter defaulted to False -> We pass in our interacive variable which is set to True, making this param True
+    and load_files defaulted to an empty tuple -> we pass in our load_files variable which is also an empty tuple
+
+********************
+*create_global_frame
+********************
+As mentioned above, the env param we provide for the read_eval_print_loop function is a function call to create_global_frame.
+This function Initializes and returns a single-frame environment with built in names as defined by our primitives implementations.
+
+*Frame initialization
+first we create an env variable and assign it to an initialization of the Frame class whose constructor takes in None. None is passed
+because this is the global frame. The initialization of Frame takes 1 parameter, parent, which assigns self.parent to the parent parameter.
+Because this is the global frame, it has no parent, so we pass in None to its constructor. It also creates the self.bindings instance attribute
+which is assigned to an empty dictionary. 
+
+*PrimitiveProcedure
+We then call env's define function on two inputs. We must evaluate all of the nested inputs before we can evaluate these inputs before we can
+understand the exact parameters of the define method. We know the first value is "eval", but now we must jump into the PrimitiveProcedure function
+to understand the second value.
+
+*Primitive Procedure is a class that defines a scheme procedure defined as a python function. It needs two params for initialization:
+    a function to set self.fn to 
+    a use_env flag to set self.use_env to, defaulted to False
+for the "eval" PrimitiveProcedure definition, Primitive procedure passes in the scheme_eval function as the fn paramter, and True as the use_env
+flag. 
+
+*scheme_eval
+We will cover this function in more detail shortly, but this function, when called, evalautes a scheme expr input in the environment. Both expr and 
+the environment as passed in as parameters. 
+
+*define - eval
+the final part is to call define on these two inputs. 
+Next we call the Frame class method define on our newly created Frame instance (env). define defines a scheme symbol SYM to have value VAL.
+define utilizes the bindings instance attribute which is a dictionary where keys are symbols and values are vals. Here, we pass in
+"eval" as the symbol, and the Primitive Procedure class instantiation with parameters scheme_eval, and True as the define function val.
+
+*define - apply
+Back in our create_global_frame function, we define another symbol "apply" and set the val to another instantiation of the PrimitiveProcedure class
+this time with scheme_apply and True passed in as params
+
+*scheme_apply
+We will cover scheme_apply in more detail shortly, but this function, when called, applies a scheme procedure paramater to argument values as the 
+args parameter in the environment as the env parameter. 
+
+
+* define - load
+The final define our create_global_frame will execute is to define the symbol "load" to another instantiation of the PrimitiveProcedure clas
+this time with scheme_load and True passed in as params
+*scheme_load
+We will also cover this function later, but this function loads in a scheme source file. Args should be in the form (SYM, ENV) or (SYM, QUIET, ENV).
+The file named SYM is loaded in environment ENV, with verbosity determined by QUIET which is defaulted to True. This allows us to read in external
+.scm files. 
+
+*add_primitives
+finally, we call the add_primitives function on the env defined in create_global_frame(). This function does not return anything. It registers the 
+bindings in _PRIMITIVES into the frame (env param). For each name in _PRIMITIVES, the add_primitives function will call define using the name of the
+primitive along with its procedure (exactly like the above eval, apply, and load functions were added to env).
+In scheme_primitives.py, you can see the list of all scheme primitive functions and their names that are added to the frame. There are over 60
+primitive functions defined that are associated with various procedures. These functions are added to _PRIMITIVES during the start of the program.
+Here are some details on how it happens. 
+
+*@primitives
+This is all possible because of the @primitives python decorator. The  @primitives decorator applies the function primitives to the function
+below it. For example, the first primitive delcaration is above the scheme_booleanp function definition. We call primitive, with *names being boolean. We enter
+the primitive function, define add(fn) and return add. We then continue with our function definitions, passing the function under @primitive('boolean?')
+as the nested add function's parameter. In this instance, the function being called while "names" is 'boolean?' is scheme_booleanp. Calling 
+add(fn) within the primitives function creates a proc variable that is assigned the the PrimitiveProcedure class instantiation taking in the passed 
+in function (let's say its scheme_booleanp) as its argument. We know the story with PrimitiveProcedure's __init__ method, which sets self.fn to the 
+function, and self.use_env to the use_env param which defaults to false (and indeed, here it is false). When then iterate through the *names parameter 
+(which is just 'boolean' for this example), append the name (boolean?) to the procedure (a PrimitiveProcedures class whose self.fn is scheme_booleanp).
+*example - add(scheme_booleanp)
+1. create a PrimitiveProcedure object whose self.fn is the function scheme_booleanp
+2. Assign proc to this PrimitiveProcedure object
+3. For name in names (names = "boolean?")
+    1. append the tuple (name, proc) to _PRIMITIVES. In this case its ('boolean?', Pointer to PrimitiveProcedure object whose self.fn is assigned to
+    scheme_booleanp)
+    2. Return scheme_booleanp
+4. Read the next primitive input val ("not") and the function definition (scheme_not) and pass it to primitive's add function.
+5. Repeat this. Whenever @primitive(name) is called, we reset the primitive name to the new input and then use that name as the first val of the tuple
+created in the add function for the subsequent function definition. 
+
+*back to add_primitives
+each name and procedure will be added to the self.bindings dict within the env variable so the env will have access to the names of all primitive 
+functions. 
+We then return the newly created environment from the create_global_frame environment. This is passed as the second parameter of the read_eval_print_loop
+function.
+
+*********************************
+*read_eval_print_loop - scheme.py
+*********************************
+once the global frame has been created, we enter into the read_eval_print_loop function. This function reads and evaluates the input until an end of 
+file or keyboard interupt occurs. AS a reminder, the inputs are:  
+    - the next_line -> our next_line function currently which returns a call to the buffer_input function if there are no args, or the redefinition of 
+    next_line if there was an argument. 
+    - the environment -> our global environment variable whose bindings are a dict of all the symbols and their vals we have defined for our 
+    scheme langage
+    - quiet setter, defaulted to False -> we do not pass in a quiet setter, so it defaults to False - controls the verbosity of our program 
+    - startup setter defaulted to False -> we do pass in a startup setter which sets the parameter to True
+    - interactive setter defaulted to False -> We pass in our interacive variable which is set to True, making this param True
+    - load_files defaulted to an empty tuple -> we pass in our load_files variable which is also an empty tuple
+we first check if startup is true. If it is, then we check our load files tuple, and for each file in load_files, we call scheme_load on 
+the file name.
+
+********************************************************************************
+*scheme_load - scheme.py if the load_files tuple is not empty & startup is True
+*********************************************************************************
+*scheme_load
+This function loads a scheme source file. the *args should be in the form (sym, env) or (sym, quiet env). The file named SYM is loaded into the 
+env ENV, with verbosity determined by quiet which is defaulted to true. 
+First it checks if the number of args is correct (should be at least 2 and no more than 3), otherwise it throws an error. The sym variable is 
+assigned to the first value in args, the quiet variable is set to the 2nd arg in args IF the length of args is more than 2, otherwise it defaults
+to True. The environment should be the last value of args, so we grab it by using the [-1] accessor. 
+We then check if sym is a scheme_stringp. The scheme_stringp takes a paramter and checks if that parameter is a string instance and starts with 
+quotation marks ". If it does, we call eval on the symbol. Eval is a built in Python function that allows us to evaluate arbitrary Python
+expressions from a string or compiled code based input. When pasing a string to eval, the function will parse it, compile it to bytecode, and then
+evaluate it as a python expression.  Eval takes an expression that needs evaluating and optional global and local arguments. You can use eval
+with boolean expressions that use value comparison (<, >, etc), logical operators (and, or, not), membership testing (in, not in), and identity
+operators (is, is not). Eval will return the truth value of the expression. It also can be used with math expressions, or general purpose expressions.
+In this case, we reassign sym to whatever sym evaluates to. We then check the type of the sym to ensure that the second param, predicate, can be 
+called on the val (symbol). So if scheme_symbolp can call sym, then its valid. 
+
+*scheme_symbolp
+This function returns True if the input is a string and the input does not start with a quotation mark. (Because we called eval on the quotation mark version,
+the evaluated version should not have a quotation mark). We know we have a symbol if this is the case. We then call scheme_open on this symbol string
+
+*scheme_open
+If either filename (the symbol we pass in above aka the evaluated string), or filename.scm is the name of a valid file, we return a Python file
+opened to it. Otherwise we raise an error. Here we return the opened filename.
+
+*scheme_load with
+we use the with statement to make exception handling code cleaner and more readable. It simplifies management of common resources like file streams.
+With with, there is no need to call file.close(). The with statement itself ensures proper acquisition and release of resources. Thw with statement
+thus helps avoid bugs and leaks by ensuring that a resource is properly release when the code using the resource is completely executed. It can be 
+used with file streams, Locks, sockets, subprocesses, telnets, etc.
+We create a lines variable and assign it to the return value of calling readlines on the opened file "infile". readlines() reads all the lines of a 
+file in one go and returns each line as a string in a list. An alternative is readline() which only returns the string of the first line. This method
+is best for large files so here we go with readlines() to get all lines of input and place it in a list. 
+we then set the args parameter to a tuple where the first element is the list of line strings, and the second is None if quiet true, otherwise it
+sets args to a tuple where the only item in the tuple is the list of lines as strings. 
+we define the next_line function, which we'll circle back to in a second.
+inside scheme_load, we then cal read_eval_print_loop() (Which is how we got to scheme_load in the first place). This time the next_line is the function
+we just defined, the environment is the global_frame, and quiet is set to quiet. Notice startup is not set here, so it is set to its default value of
+False. Interactive is also not set, nor is load_files().
+What we have now is a list of lines as strings as part of a tuple called args. This set up only occurs when a scm file is loaded from disk using the 
+-load keyword in terminal as opposed to the other option of having someone interact with the interactive interpreter (or an input file via another method)
+
+****************************************************
+*read_eval_print_loop - scehem.py - startup is False
+****************************************************
+Inside the read_eval_print_loop, startup is now false, so we skip over the filename and scheme_load procedures.
+We have the info we need to begin reading and evaluating the code, so we enter into the while statement, which is an infinite loop until the user provides
+a keyboard interrupt, or in the case of reading files from disk, we reach the end of the file. 
+
+We assign the variable src to the return of calling next_line. Recall next_line is the first param of this function and is itself a function 
+defined in scheme_load. 
+
+-------------
+*next_line() - if we have an input file. 
+-------------
+next line returns a call to buffer_lines which was defined in the main run function if we have an input file. 
+
+-------------
+*next_line() - if we are reading from user input
+-------------
+next line returns a call to buffer_input. Recall that next_line was the first variable that we assigned in the main run function. next_line is assigned to the 
+buffer_input function, which is then passed into the read_eval_print_loop. 
+
+-------------
+*buffer_lines - scheme_reader.py
+--------------
+buffer_lines returns a buffer instance iterating through lines. It takes the lines as the first argument, and default parameters prompt (set to
+"scm> ") and show_prompt (set to False). Remember lines is a list containing each line of text from a file.
+
+If show_prompt is true, we create an input_lines variable and assign it to our lines list input. If show_prompt is false (it is by default) then we
+create the input_lines variable and assign it to an instance of the LineReader class whose constructor inputs are the lines and the prompt
+default variable "scm> ". 
+
+-------------
+*buffer_input
+-------------
+buffer_input takes in a prompt defaulted to "scm> " only. This function returns an instantiation of the Buffer class which takes as input a call 
+to tokenize_lines using an instantiation of the InputReader class as its input. 
+
+-------------
+*LineReader
+-------------
+The line reader class is an iterable that prints lines after a prompt. It takes as initialization arguments, the lines, a prompt, and a comment
+character which defaults to ';'. Here, lines is a list of strings of lines from the file. The prompt is "scm> ". It sets 
+its self.lines, self.prompt, and self.comment instance attributes to these values. 
+
+*back in buffer_lines
+we then return a Buffer instance whose input is the tokenize_lines function with the input_lines as its input. 
+return Buffer(tokenize_lines(input_lines)) -> before we return, we evaluate the nested expressions so we call tokenize_lines on the LineReader class
+instance input_lines.
+
+-------------------
+*InputReader
+-------------------
+The InputReader class initialization function sets the instance attribute self.prompt to the input prompt "scm> "
+
+*back in buffer_input
+we then return a Buffer instance whose input is the tokenize_lines function with the InputReader object as it's input. 
+return Buffer(tokenize_lines(InputReader(prompt))) -> before we return, we evaluate the nested expressions so we call tokenize_lines on the InputReader 
+class instance. 
+
+
+------------------------------------
+*tokenize_lines() - scheme_tokens.py
+------------------------------------
+this function returns an iterable map object where the input is the LineReader/InputReader class instance (which is an iterable and why this works) and the tokenize_line
+function is the function. 
+
+*Back in buffer_lines
+The returned map object from tokenize_lines is then passed as the parameter for the instantiation of the Buffer class instance. 
+
+-------------------
+*Buffer - buffer.py
+-------------------
+Buffer takes 1 argument for initialization, which is the map object (src). It has several instance attributes index, lines, source, and current_line. 
+index is set to 0, lines is set to an empty list, source is set to the map object, and current line is set to an empty tuple. As part of the 
+buffer initialization, it calls its class method current.
+
+----------------------
+*current() - buffer.py - LineReader
+----------------------
+The current function returns the current element or None if none exists. First it calls the more_on_line function which returns True if the index
+is less than the length of the current_line variable (this small function is just above the definition of current). Since this is the first time we are calling 
+the function since initializing the Buffer instance though, current_line is actually an empty tuple, so more_on_line will return False, making the while 
+not check evaluate to True. We enter the while loop since current_line is empty.
+
+First We set self.index to 0 (for instances where we are at the end of a line), and then we try a series of statements.
+We try to set self.current_line (which is currently an empty tuple) to the return of the next function called on the source (which is the map object). The 
+next function returns the next item from the map object. Recall the map object consists of a LineReader class and the tokenize_lines
+function. When we call next on this map object, we jump to the __iter__ special method in the LineReader class. Since a call to map will automatically iterate
+over the iterable object we have given to the map function (LineReader) and call the function on it. The map function will use LineReader's __iter__ special
+function in order to get the next string from LineReader's list of strings (it's line instance attribute)
+
+---------------------
+*Current() - buffer.py InputReader
+---------------------
+The current function returns the current element of None if none exists. The big difference between the InputReader workflow and the LineReader workflow, is that
+calling next(self.source) will call next on an InputReader, which also has an __iter__ function just like LineReader. 
+
+------------------------------------
+*__iter__ in LineReader in buffer.py 
+------------------------------------
+Recall self.lines in LineReader is a list of strings of lines from the .scm file. self.prompt is "scm> " and comment defaults to ';'.
+In the __iter__ method, while there are lines still in the list, we pop the first element (element 0) off the list of strings (so the first line of the file) and strip 
+it of any new line characters. Line is now a string of the curent line. We then check to see if self.prompt is not None (which it isn't by default because 
+it's set to "scm> "). We also check to make sure the line string is not empty. Finally we make sure that the left most character of line string is not the 
+comment character ';'. If it is, we avoid entering the if statement (printing the line to conosle). If it isn't, we print the prompt + the line to the 
+scheme console, we then set primpt to 5 space characeters. 
+
+side note on lstrip: line.lstrip().startswith(self.comment) -> lstrip() ensures all leading white spaces are removed from the left of the string until the first mismatch. 
+startswith(self.comment) -> returns True if the string starts with the specified character (in this case ';'). 
+
+Assuming there is a prompt, the line isn't empty, and the line doesn't start with the comment character indicator, we print to the interpreter the current line
+preceeded by the self.prompt. so the printed line will be something like:
+"scm> (+ 1 2)"
+
+Finally, outside of the if statement, we yield the result. 
+
+Yield - this allows us to suspend function execution and send a value back to the caller, while maintaining enough state 
+to enable the function to resume where it left off. The next time we start the function, we'll start from the end of the if statement, so the first step 
+will be to check the while statement to ensure self.lines is not None. yield returns a generator which is a kind of iterable you can only iterate over 
+once. Generators do not store values in memory, they generate values on the fly. The function returns the generator object which runs the code up til yield
+and returns the value of that loop. This will continue (aka we will continue grabbing new lines) until the yield statement is no longer reached, in which case
+we've hit the end of the file. 
+
+So __iter__ prints the current line to the console, which is why when we load a .scm file and run it, the console prints out that scheme file to the console. 
+calling next on LineReader returns a string, the single line of text for that line of the program. 
+
+The way we got here in the first place was by calling next on self.source in Buffer's current function. Recall that self.source is a map object tying LineReader
+to tokenize_line(). when we called next on self.source, we iterate through the map object once. Since the input to the map object is an interable type (LineReader),
+the map function implicitly calls LineReader's __iter__ method to grab the next element to call tokenize_line on. Thus we entered the LineReader class instance to 
+grab that next line in the list. Now that we have the next line from the LineReader class, we call tokenize_line on it.
+
+-------------------------------------
+*__iter__ in InputReader in buffer.py
+-------------------------------------
+While True, the iter of InputReader yields a user input with the input prompt being the prompt "scm> "
+calling next on InputReader grabs the current line of user input as the line of text
+
+Since we got here by calling next on self.source in Buffer's current function, recall that self.source is the map object tying InputRader to tokenize_line(). When
+we call next on self.source, we iterate through the map object once. Since the input to the map object is an iterable type (InputReader), the map function 
+implicitly calls InputReader's __iter__ method to grab the next line of user input to call tokenize_line on. Thus we entered the InputReader class instance to 
+grab that next line. Now that we have that next line from the InputReader class (the user input typed into the interpreter), we call tokenize_line on it. 
+
+
+-----------------------------------
+*tokenize_line() - scheme_tokens.py
+-----------------------------------
+this function returns a list of scheme tokens that make up the input line.
+First we create an empty result array that will store the list of scheme tokens. Then we create two variables text, and i. We assign them to the return of the
+next_candidate_token() function, which returns a tuple. 
+
+-----------------------------------------
+*next_candidate_token - scheme_tokens.py
+-----------------------------------------
+Takes in the current input line and 0. 
+This function returns a tuple where the first element is the next substring of the input line at position k (the second input, the number, in this case 0), that could
+be a token. The second element of the tuple is the position in the line following that token. 
+The function returns (None, len(line)) if there are no more tokens - aka No tokens, and the i is the last position in the line.
+
+While the input k is less than the length of the line, we are going to make our way through it. At this point in the program, k is 0, so as long as the length of the line
+is greater than zero (which was already checked in the __iter__ method of the LineReader class), we'll continue. 
+
+# Note: Only one of these if statements will fire each time we call tokenize_line, so skip ahead of curious about overall flow #
+
+We grab the first char of the line and assign it to c. If c is a ';', then the line is a comment, so we skip over it by returning None and the length of the line (so 
+next iteration we grab the next line). 
+
+if c is in the _WHITESPACE constant, we increment k to skip passed it. As part of the elif clause, it will circle back aronud to the top of the while loop and reassign c to the next
+character in the line. 
+
+if c is in the _SINGLE_CHAR_TOKENS constant, then we return the tuple with that char and the next value of k. i.e. ('(', 1)
+
+if c is a '#', then it's a boolean value, so we return a tuple where that char and the next one with line[k:k+2] to grab the whole thing ('#f' is two characters long) is the first
+value, and the value after the char is the new k unless that value is outside the bounds of the line, in which case the second value is the length of the line. 
+
+if c is a ',', it's an unquote special character, so we check if the next value is '@'. if it's the case, then we return ',@' as the first value in the tuple, and the 
+position after '@' as the second value. If '@' is not the second character, we just return ',' and the next position.
+
+if c is in _STRING_DELIMS, then it is a quotation mark, which means this is likely the beginning of a string. We first check for a double quote. If the next val is also a
+quotation mark, then we return the double quote and the next positional element. 
+
+If the next value isn't a quotation mark, then we create the line_bytes variable and assign it to the tuple where the first, and only, value is the rest of the line converted
+to an immutable bytes object. Note: in order to convert a string to bytes, you must pass an encoding argument as the second arg. "utf-8" is the standard encoding. 
+we then create the gen variable (stands for generator) and assign it to the line tokenize.tokenize(iter(line_bytes).__next__)
+
+what this does is create a generator by first creating an iterator using line_bytes. It then gets the iterator's __next__ function and passes it into the tokenize function.
+Recall the iter object has the function __next__ which can be called with .__next__() or more commonly next(iter_var). Here, we do not call it, but instead pass the __next__ 
+method into the tokenize function. We create a tuple_iterator object by calling iter(line_bytes). iter(line_bytes).__next__ is a method-wrapper or decorator. We pass this
+method-wrapper into tokenize. 
+
+tokenize.tokenize requires one argument, the line to be read, which must be a callable object. Each call to the function returns one line of input as bytes. tokenize uses the 
+readline() function in its implementation, which we know about from above. Tokenize() is a generator. Since the .__next__ function is callable, this works. 
+tokenize breaks a stream of bytes into Python tokens. It decodes the bytes accoding to PEP-0263 for determining source file encoding. It accepts a readline-like method which
+is called repeatedly to get the next line of input or b"" for EOF. It generates 5 tuples with these members (each time a call to next occurs):
+    the token type
+    the token (a string)
+    the starting (row, column) indices of the token (a 2-tuple of ints)
+    the ending (row, column) indices of the token (a 2-tuple of ints)
+    the original line (string)
+
+gen is a generator object _tokenize where each call to next will return all 5 tuples listed above. If one were to iterate over the generator object, one would get something
+like the following: 
+TokenInfo(type=63 (ENCODING), string='utf-8', start=(0, 0), end=(0, 0), line='')
+TokenInfo(type=3 (STRING), string='"hello there captain"', start=(1, 0), end=(1, 21), line='"hello there captain"')
+TokenInfo(type=4 (NEWLINE), string='', start=(1, 21), end=(1, 22), line='')
+TokenInfo(type=0 (ENDMARKER), string='', start=(2, 0), end=(2, 0), line='')
+
+We see that each token type is identified in the first tuple, the token itself in the second tuple, positioning elements in the 3rd and 4th tuple, and the original line
+in the final tuple. Notice how, although tokenize() took in a byte object, the token itself is a string. 
+
+*next(gen) 
+we call next(gen) to throw away the encoding token which is the first set of tuples (the type=63 (ENCODING) above). it gives info about the string encoding (like 'utf-8'), but 
+doesn't give any values. we then create and assign the variable token to the next iteration of the gen variable. This makes the token variable type tokenize.TokenInfo where
+each of the 5 tuples are stored in it. IF you were to iterate through token, you'd get the type number, the string, the positoning tuples, and the orignal line. 
+we then check if the token.type is equal to tokenize.STRING. We can check each tuple in the token using the .type .string .start .end and .line function calls on the 
+token variable. they will match with the information stated in each line above. if token.type is 3, then it is a string type. This is what we are checking for. We raise
+an error if the token is not a string. 
+
+otherwise, we return the tuple of the token.string along with the sum of the second tuple value in token.end and k to get the next positional argument. 
+
+If the char c we got at the beginning of next_candidate_token is not in string delims (not a quotation mark) then it must be in one of the other constant variables
+such as _NUMERAL_STARTS, _SYMBOL_CHARS, _TOKEN_END, OR _DELIMITERS. 
+
+here we create the variable j and assign it to the value of k (integer representing the position in the line)
+
+while j is less than the length of the line, and the character at line[j] is not in _TOKEN_END (not whitespace, not a single char token, not a string delim, not an unquote
+character), we increase j. When we hit a whitespace, we know we've got a new token to return. 
+
+When we finally get to a _TOKEN_END character, we break out of the while loop and return the tuple where the first element is the line from k up until j, and the second is 
+the positional element j or the length of the line, whichever is smallest. 
+
+*back to tokenize_line
+Now we have text equal to some token or line of tokens as a string, and we have i equal to an int representing where we are at in the line. We won't need i for a bit.
+
+We enter a while loop while text is not None. Recall the return of next_candidate_token is None when we are at the end of a line and at a comment.
+
+If the text token is in DELIMITERS, we append it to the token result list. This includes _SINGLE_CHAR_TOKENS like such as ( ) ' ` and . , ,@. (often indicating the
+beginning of an expression). Since we are in a long if elif else chain, appending the result will take us to the last statement in the while loop where we call 
+next_candidate_token on line and i again and reassign these values to the text and i variables we defined at the beginning of the function. We then go through the 
+while loop again. 
+
+If text is a bool, then we append the python True or False values depending on which it is.
+
+If text is nil, we add nil to the result list.
+
+If the first char in the token string is in the _SYMBOL_CHARS constant, that means its either a special character, a lowecase ascii letter, an uppercase ascii letter, the
+digits 1-9, or + - . - this essentially covers the majority of scheme syntax. The other character sets help us contextualize how to interpret these sorts of characters.
+
+If the first char in the token string is in _SYMBOL_CHARS, we first create a variable called number and assign it to False (we assume it isn't a number)
+
+We then see if the first char in the token is in the _NUMERAL_STARTS constant. First we try to cast it to an int and append it to the result list. We also set number to True. 
+If that fails we enter the except clause and try to cast it to a float and append it to the result list. We also set the number to True here. 
+
+If that fails, we enter the nested except clause which means that the char is either + - . (but we don't add it yet)
+
+When we get to the second nested if statement, we check if number is False, which it will be if we didn't add the char to the results list already.
+
+We then pass the whole text (not the text[0] like we did first - just incase it's a variable name), into the valid_smybol function which returns a bool.
+
+--------------------------------
+*valid_symbol - scheme_tokens.py
+--------------------------------
+Valid symbol is a simple function that first checks the length of the input. If its 0, it returns false. 
+It then iterates through every character in the input and ensures that each character is in the _SYMBOL_CHARS constant. if not, it returns false, otherwise if it makes 
+it through the whole input, it returns True, confirming we have a valid symbol we are looking at. 
+
+-----------------------
+*back in tokenize_line
+-----------------------
+if we have a valid_symbol, we append the whole text (either a single symbol char or special name) to the result list after converting it to lowercase. 
+
+If its not a valid_symbol, we raise a ValueError
+
+Outside of the nested if statement, if it was the case that text[0] was not in _SYMBOL_CHARS, we check if text[0] is in _STRING_DELIMS (")
+
+If it is, we append the entire text to the token result list (for any strings we need to grab in the line) 
+If we get to the else clause, we print warnings about invalid tokens and formats.
+
+We then call next_candidate_token on the line and i as mentioned earlier and reassign text, and i to the return value. Then we continue through another iteration of 
+the while loop until the text has been exhausted. 
+
+At the end of tokenize_line, we return the list of tokens from the line of text that we deciphered.
+
+returning to current() - LineReader 
+Since self.source is the map object. Calling next on the map object will run the tokenize_line function on the input_lines input which is the LineReader instance.
+As stated above, the map function will iterate over the LineReader instance using LineReader's __init__ method, so each call to tokenize_line will take the 
+return of the __iter__ method (a string) as input. You can think of the map object as a list of function calls on the iterable object until there is nothing left
+to iterate in the "range". It stops when the iterable is exhausted (or in this case, when the EOFError is reached within LineReader's __iter__ method). But by calling
+next on the map object, we only do one iteration at a time. And because LineReader's __iter__ method has a yield statement, we only ever grab one line at a time.
+
+back here, we set our self.current_line equal to the return of call to next(self.source). self.current_line now equal the list of tokens on the current line. 
+
+we then append the list of tokens to the self.lines list.  If we are at the end of the source (end of the entire map object), then we set current_line to an empty 
+tuple and return none.
+
+Otherwise, we return the character at the current index (self.index) of the self.current_line (the result list of tokens from the line of input). 
+In an example where the input list is ['(', '+', 1, 2, ')'], the return value (assuming self.inded is 0), would be the string '('
+
+returning to current() - InputReader
+Since self.source is the map object. Calling next on the map object will run the tokenize_line function on the user input which is an InputReader instance. 
+
+back here, we set our self.current_line variable equal to the return call of next(self.source). self.current_line is now equal to the list of tokens of the 
+user input. 
+
+we then append the list of tokens to the self.lines list. Finally, we return the character at the current index of the self.current_line. In typical user input at 
+the start of a line, this would be '(' (this doesn't do anything for now, but we do rely on current to get our input so it was necessary to call)
+
+--------------------
+*Back to Buffer init
+--------------------
+We then briefly return to the Buffer initialization function since that is where we called current() initially. 
+Buffer's init method returns none. 
+
+*back in buffer_lines - LineReader
+we return the buffer class instance we just created where current_line is the list of tokens that make up the current line, the source is the map object, and the
+lines is the list of lists of tokens for each line. 
+
+*back in buffer_input - InputReader
+we return the buffer class instance we just created where current_line is the list of tokens that make up the current line of user input, the source is the map 
+object, and the lines is the list of lists of tokens for each line. 
+
+*back in the next_line function - inside main - LineReader only
+the return value of buffer_lines(lines) or buffer_input which is the buffer instance. 
+
+-------------------------------
+*back to read_eval_print_loop
+-------------------------------
+We assign src to this buffer instance.
+
+we then enter the while loop while src.more_on_line
+recall more_on_line simply returns true if the index is less than the length of the current_line. current_line is a list of tokens that make up the current line. 
+
+we then call scheme_read on src and assign it to the variable expression. 
+
+**********************************
+*scheme_read - in scheme_reader.py
+**********************************
+scheme_read reads the next expression from src, the buffer of tokens.
+
+First we call current on src to get the next token. If it's none, we raise an EOFError. 
+
+---------
+*current
+--------
+current checks if self.index is NOT self.more_on_line. Since more_on_line will return true, the while loop will evaluate to False so we skip the try suite and 
+return self.current_line[self.index] to get a single token.
+
+*scheme_read
+we then create a variable val and assign it to the return of the pop function which we call on src. 
+
+-----
+*pop
+-----
+pop removes the next item from self and returns it. If self has exhuasted its source, it returns None
+we create a variable call current and assign it to a call to current.
+
+once we get the value at the index, we increment the index so we don't get that value again. (up til this point, we have never incremented self.index)
+
+we return the string we get from the list of tokens at that index.
+
+--------------------
+*back in scheme_read
+--------------------
+we assign val to the current token and then check it's value
+
+if val is nil, we return nil
+
+if val is not in DELIMITERS, we return val
+
+if val is a quote, then we return a Pair class instantiation where 'quote' is the first argument, and a Pair(scheme_read(src), nil) is the second argument
+
+if val is an open parenthesis, we read the tail of the src
+
+otherwise we return an error
+
+Assuming val = '(', let's continue
+
+-----------------------------
+*read_tail - scheme_reader.py
+-----------------------------
+This function returns the remainder of a list in src, starting before an element or )
+
+in the try, we first check if src.current() is None. Since the index was incremented in scheme_read by calling pop, we get the next value after that first
+we popped back in scheme_read
+
+if src.current == ')' then we pop it and return nil
+
+if src.current == '.' then we pop it, we then scheme_read the next element in the list
+Since calling scheme_read on the next element will also call pop and continue the recursive calls between scheme_read and scheme_tail, we continue doing that
+until we've built up a return value (likely nested pairs). When we finally surface back to the temp = scheme_read(src) function, we'll be at the end of the 
+recursive calls. 
+We check if the current element is a closing parenthesis. If it is, we pop it and return temp, the built up variable of nested Pairs
+
+otherwise we raise a SyntaxEerror
+
+if src.current() isn't a '.', then we call scheme_read on the src and assign it to the newly created first variable. 
+
+In the example where the current_line is  ['(', '+', 1, 2, ')']
+    1. we get the first val '('
+    2. we call read_tail on the rest of the list
+    3. we get the current val '+'
+    4. we scheme_read it
+    5. since it's not in DELIMITERS, we return it so nested first (1) is +
+    6. we then read_tail the src which is 1, 2, ')'
+    7. we set nested first (2) to 1
+    8. we read_tail 2, )
+    9. we set nested first (3) to 2
+    10. we read tail )
+at the end, since src.current() is ')', we pop it and return nil:
+    11. rest = nil
+    12. we then create a Pair(first, rest) -> Pair(2, nil) and return it (return nested first (2))
+    13. rest is now Pair(2, nil). We then return Pair(first, rest) -> Pair(1, Pair(2, nil)) (1)
+    14. rest is now Pair(1, Pair(2, nil)), we then return Pair(first, rest) -> Pair(+, Pair(1, Pair(2, nil)))
+
+------------------------
+*Pair - scheme_reader.py
+------------------------
+The Pair class is initialized with two values. The first is set to self.first, and the second is set to self.second
+
+the pair class defines __repr__ and __str__ method functions.
+__repr__ displays the pair as "Pair(x, y)"
+__str__ displays the pair as "(x, y)"
+
+Pair class also has a __len__ special function that counts the length of the pair for every time the second element in the pair is also 
+a pair. It defaults to 1 assuming a non empty pair -> Pair(1, nil) is of size 1
+
+Pair allows [] access with the __getitem__ method which returns the first element in a pair k elements deep
+
+Pair allows comparison via the __eq__ method. If both the first and second vals of the pair are equal to another, it returns True, otherwise False
+
+Pair also includes a map function which returns a scheme list (a pair of pairs) after mapping a python function fn to self. 
+
+-------------------
+* back to read_tail
+-------------------
+
+This brings us out of the read_tail(src) call in our original scheme_read call. so we return the read_tail which is
+Pair(+, Pair(1, Pair(2, nil)))
+
+as you can see, the read_scheme and read_tail functions are used recursively to construct nested Pairs from the buffer src (the list of tokens)
+
+-----------------------------
+*back to read_eval_print_loop - scheme.py
+-----------------------------
+we set our expression function to our call to scheme_read(src), which returned the nested Pair object of tokens
+
+we then create a result variable and set it to a call to our scheme_eval function which takes in our expression (Pair object of tokens) and the environment
+
+************************
+scheme_eval - scheme.py
+************************
+the scheme_eval function evaluates a scheme expression in the given environment.
+
+first we check if the expr is None, if it is, we raise a SchemeError
+
+then we call scheme_symbolp on the expression which checks if the expr is a string but doesn't start with ". Arithemtic is the most common case for this where
+the first value of a pair equals a symbol '+', '-', '/', or '*'
+
+if it is the case that scheme_symbolp(expr) evaluates to True, we return a call to the environment's lookup function passing in the expr as the argument
+
+---------
+*lookup
+---------
+Lookup returns the value bound to symbol in an environment
+
+first we set val to nothing,
+
+if the symbol is in the self.bindings dict of the environment, then we return the symbol's associated key
+
+otherwise, if the environment has a parent environment, we look up the symbol there.
+
+If neither of those two functions are called, we raise a SchemeError. 
+
+the return of lookup should be a PrimitiveProcedure where self.fn is a primitive function
+
+-----------------------------------------------
+*scheme_eval - if scheme_symbolp(expr) is True
+-----------------------------------------------
+
+we return the value we get when we lookup the expr in the env, which is a PrimitiveProcedure class instance
+
+This primitive procedure is returned from scheme_eval. 
+
+-------
+
+if it isn't a scheme_symbolp, then we check if the expr is an atomic (a bool, number, symbol, or null)
+we also check if its a string (Starts with "), or the expr is okay (a class in scheme_primitives)
+
+If it isn't any of these, it checks if the expr is a scheme_listp. If it isn't, it raises a SchemeError
+
+------------
+scheme_listp
+------------
+while x is not nil, scheme_listp checks if x is a Pair. If it is, it assigns x to x.second and tries again until
+we get to the end of the list. If at any point while iterating through the scheme list, x is not a Pair, it returns false
+unless we have reached the end of the list, in which case it returns True. 
+
+*back in scheme_eval
+we assign first to expr.first and rest to expr.second
+in this example, first = '+' and rest = Pair(1, Pair(2, nil))
+
+if scheme_symbolp(first) returns True -> it's a string and doesn't start with "
+and first is in LOGIC_FORMS constant -> and, or, if, cond, begin, then we'll scheme_eval using the values in the LOGIC_FORMS dictionary. the LOGIC_FORMS
+dictionary includes a string symbol and a corresponding function for that sort of evaluation, which we'd pass rest and env into. 
+
+otherwise we check if first is "lambda", if it is, we call the do_lambda_form function on rest, and env
+
+otherwise we check if first is "mu", if it is we call the do_mu_form function on rest
+
+otherwise if first is "define", we call the do_define_form function on rest, and env
+
+otherwise if first is "quote", we call the do_quote_form function on the rest
+
+otherwise if first is "let", we call the do_let_form function on the rest and env
+
+otherwise, if it's none of these special cases, we create a procedure variable and assign it to a recursive call to scheme_evail, passing in the first
+value and the environment. 
+
+procedure will be assigned to a PrimitiveProcedure object where it's self.fn is a primitive function
+
+we then create a variable args and assign it to a call on rest's map function. map is a custom function in the Pair class. Map's input is the lambda 
+expression where for each operand, we call scheme_eval on the operand and the environment
+
+-------
+*map
+-------
+map creates a mapped variable and sets it equal to the result of calling a function on self.first. Since the function is scheme_eval, we call scheme_eval on
+self.first which is 1 in our example Pair(1, Pair(2, nil))
+
+*scheme_eval 
+we call scheme_eval on the operand and look up what to do. In the instance of Pair(1, Pair(2, nil)), 1 is the operand, so when it gets to the scheme_atomp(expr)
+check, it will return itself. 
+
+so mapped will be equal to whatever scheme_eval on the first val if self is. in this instance mapped = 1
+
+we then check if self.second is none or another pair. If it is, we return a Pair where the first value is mapped, and the second value is a recursive call 
+to Pair's map function using scheme_eval as the input so Pair(2, nil) -> 2 will be mapped we do this until we get to nil
+
+When we get to nil, we notice that there is a nil class
+
+----------
+*nil class
+----------
+This class allows is to print different forms of nil, get it's length, and we also notice nil has it's own map class. If map is called on nil, it returns itself.
+
+-----------------
+*map - Pair class
+-----------------
+if we call map on nil, we return self, which returns self. Since we are recursively in Pair, self is Pair(2, nil), then self is Pair(1, Pair(2, nil))
+
+--------------------
+*back to scheme_eval
+-------------------- 
+so args will return a scheme list of values. In this case, it doesn't change from what our "rest" was, but in the case of more complicated functions, it
+would look different.
+
+we then return a call to scheme_apply where the inputs are the procedure (a PrimitiveProcedure where self.fn is a primitive function), args (a scheme list of 
+values), and the current environment. 
+
+************************
+scheme_apply - scheme.py
+************************
+first we'll check if the procedure is an instance of a PrimitiveProcedure class. If it is, it returns a call to the apply_primitive function, passing in the
+procedure, the args, and the environment 
+
+if not we check if it's an instance of a LambdaProcedure class
+
+if it's not either of those, we check if it's an instance of a MuProcedure class
+
+and if it's none of these, we raise a SchemeError
+
+***************************
+apply_primitive - scheme.py
+****************************
+first we make a python list out of the args argument and assign it to py_list. This is only possible because we defined a length function and a __getitem__ function
+for Pair. The list function first gets the length of the object to be converted to a list, and then uses __getitem__ to loop through the object, returning every
+value to the list. Using the example Pair(1, Pair(2, nil)), converting this to a Python list would make [1, 2]
+
+we then check if procedure.use_env is true. If use_env were true, that would mean there is a parent environment, so we append the envionment to the py_list
+
+otherwise, we try to return the value of calling the procedure's function on the py_list. We'll locate the PrimitiveProcedure's self.fn, and using the 
+list of args, try to evaluate the procedure. 
+
+in the case of Pair('+', Pair(1, Pair(2, nil))), we know the PrimitiveProcedure's self.fn is the scheme_add function. 
+
+*scheme_add 
+this primitive function returns a call to _arith using the python operator.add, 0, and the list of vals as inputs
+
+*_arith
+_arith first checks that the values in the vals tuple are numbers by calling the _check_nums function.
+
+*_check_nums
+this functin iterates through vals. scheme_numberp(v) is false, it raises an error, otherwise it returns none. 
+
+*_arith 
+after checking if all the vals are numbers, we assign the value of init to the variable s. init is initially 0, so s is 0
+we then iterate through the vals tuple and assign s to the return of calling the input function on s and that value. since the input
+function is Python's operator.add function, we call add(s, val). 
+    1. s = 0 + 1
+    2. s = 1 + 2
+after iterating through the tuple, we then check if round(s) == s. We then set s to round(s)
+finally we return s from _arith
+
+*scheme_add
+we thus return the value from scheme_add
+
+*apply_primitive
+we thus return the value from apply_primitive
+
+*scheme_apply
+we thus return the value from scheme_apply 
+
+*scheme_eval 
+we make our way out to scheme_eval and return the value from scheme_eval
+
+******************************
+*back to read_eval_print_loop
+******************************
+we thus assign the return value of scheme_eval to the variable result
+
+If quiet is not True and result is not None, then we print the result to the terminal tos how the user what the reult of their valid scheme expression is
+
+we check if there is any more to the line via the inner while loop. It returns false, so we break out of the try statement and come back to the outer infinite
+while loop. 
+
+from here, we call next_line() and assign it to src to begin the process over again, assigning src to the next Buffer object where current_line is a list of tokens
+representing the next line of the .scm input file.
+
+
+
+Pair('quote', Pair('hello', nil))
+first = quote
+second = Pair('hello', nil)
+
+print(str(second))
+
+(hello)
